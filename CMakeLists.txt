@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 
-project(sound-server LANGUAGES CXX C)
+project(dirview LANGUAGES CXX C)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
