@@ -1,0 +1,8 @@
+{
+    "command-runner.terminal.name": "runCommand",
+    "command-runner.terminal.autoClear": true,
+    "command-runner.terminal.autoFocus": true,
+    "command-runner.commands": {
+        "run": "cd ${workspaceFolder} && ./scripts/build.py -c -b --config Debug --link && cd ${workspaceFolder}/build/Debug/src && ./main",
+    }
+}
