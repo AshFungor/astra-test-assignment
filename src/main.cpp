@@ -48,59 +48,21 @@
 **
 ****************************************************************************/
 
+#include <QDebug>
+#include <QTreeView>
+#include <QLineEdit>
+#include <QVBoxLayout>
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QFileSystemModel>
 #include <QFileIconProvider>
-#include <QTreeView>
 #include <QCommandLineParser>
 #include <QCommandLineOption>
-#include <QLineEdit>
-#include <QVBoxLayout>
 #include <QSortFilterProxyModel>
-#include <QStyledItemDelegate>
 
-// STD
-#include <functional>
+// our stuff
+#include <src/model/custom-search-wrapper.h>
 
-// custom sorting & model
-#include "custom-search-wrapper.h"
-#include "custom-model.h"
-
-class ButtonDelegate : public QStyledItemDelegate {
-    Q_OBJECT
-public:
-    explicit ButtonDelegate(QObject *parent = nullptr) : QStyledItemDelegate(parent) {}
-
-    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override {
-        if (index.column() == 1) {  // Column where the button should appear
-            QStyleOptionButton button;
-            button.rect = option.rect;
-            button.text = "Click";
-            QApplication::style()->drawControl(QStyle::CE_PushButton, &button, painter);
-        } else {
-            QStyledItemDelegate::paint(painter, option, index);
-        }
-    }
-
-    bool editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option, const QModelIndex &index) override {
-        if (index.column() == 1 && event->type() == QEvent::MouseButtonRelease) {
-//            QMouseEvent *mouseEvent = qobject_cast<QMouseEvent*>(event);
-//            if (option.rect.contains(mouseEvent->pos())) {
-//                emit buttonClicked(index);  // Emit a signal to handle the click
-//                return true;
-//            }
-        }
-        return QStyledItemDelegate::editorEvent(event, model, option, index);
-    }
-
-    virtual ~ButtonDelegate() = default;
-
-signals:
-    void buttonClicked(const QModelIndex &index) const {
-
-    }
-};
 
 int main(int argc, char *argv[])
 {
@@ -120,36 +82,36 @@ int main(int argc, char *argv[])
     const QString rootPath = parser.positionalArguments().isEmpty()
         ? QDir::homePath() : parser.positionalArguments().first();
 
+    // add some more controls to support search
+    auto window = new QWidget;
+    auto edit = new QLineEdit;
+    auto container = new QVBoxLayout{window};
+    auto tree = new QTreeView;
+
     // insert our search wrapper here
     auto searchString = std::make_shared<QString>();
-    CustomModel model;
-    CustomSearchWrapper wrapper {searchString};
-    wrapper.setSourceModel(&model);
+    auto model = new QFileSystemModel;
+    auto wrapper = new test::CustomSearchWrapper{searchString};
+    wrapper->setSourceModel(model);
 
-    auto tree = new QTreeView{};
-    ButtonDelegate *delegate = new ButtonDelegate(tree);
-    tree->setItemDelegateForColumn(model.columnCount() - 1, delegate);
+    model->setRootPath("");
+    if (parser.isSet(dontUseCustomDirectoryIconsOption)) {
+        model->iconProvider()->setOptions(QFileIconProvider::DontUseCustomDirectoryIcons);
+    }
 
-    model.setRootPath("");
-    if (parser.isSet(dontUseCustomDirectoryIconsOption))
-        model.iconProvider()->setOptions(QFileIconProvider::DontUseCustomDirectoryIcons);
-
-    tree->setModel(&wrapper);
+    tree->setModel(wrapper);
     if (!rootPath.isEmpty()) {
-        const QModelIndex rootIndex = model.index(QDir::cleanPath(rootPath));
-        if (rootIndex.isValid())
-            tree->setRootIndex(wrapper.mapFromSource(rootIndex));
+        const QModelIndex rootIndex = model->index(QDir::cleanPath(rootPath));
+        if (rootIndex.isValid()) {
+            tree->setRootIndex(wrapper->mapFromSource(rootIndex));
+        }
     }
 
     // set filter to include hidden files & (all) dirs
-    model.setFilter(
+    model->setFilter(
         QDir::AllDirs | QDir::Hidden | QDir::Files | QDir::NoDot | QDir::NoDotDot
     );
 
-    // add some more controls to support search
-    auto window = new QWidget{};
-    auto container = new QVBoxLayout{window};
-    auto edit = new QLineEdit{};
     container->addWidget(edit);
     container->addWidget(tree);
 
@@ -175,11 +137,13 @@ int main(int argc, char *argv[])
 
     int retval = app.exec();
 
-    // clearup
-    delete edit;
+    // cleanup
+    delete wrapper;
     delete tree;
+    delete edit;
     delete container;
     delete window;
+    delete model;
 
     return retval;
 }
